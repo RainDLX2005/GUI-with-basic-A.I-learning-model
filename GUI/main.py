@@ -6,7 +6,7 @@ from matplotlib.figure import Figure
 from PyQt5.QtWidgets import QGraphicsScene
 
 from weather_api import get_hourly_forecast
-from regression import predict_next_24h_from_csv
+from regression import predict_from_csv
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -19,7 +19,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.load_weather()
 
         forecast = get_hourly_forecast()["list"]
-        real, predicted = predict_next_24h_from_csv("df_weather.csv")
+        real, predicted = predict_from_csv("df_weather.csv")
         self.plot_prediction(real, predicted)
 
     def plot_prediction(self, real, predicted):
@@ -32,32 +32,33 @@ class MainWindow(QtWidgets.QMainWindow):
 
         ax = fig.add_subplot(111)
 
-        step = 3  
-        hours_real = list(range(0, len(real) * step, step))
-        hours_pred = list(range(hours_real[-1] + step,
-                        hours_real[-1] + step * (len(predicted) + 1),step))
+        days_real = list(range(len(real))) 
+        days_pred = list(range(len(real), len(real) + len(predicted)))
 
-        time_labels = [f"{h % 24}:00" for h in hours_real + hours_pred]
+        day_labels = (
+            [f"Day-{len(real)-i}" for i in range(len(real), 0, -1)][::-1]
+            + [f"Day+{i+1}" for i in range(len(predicted))]
+        )
 
+        ax.plot(days_real, real, label="Observed (history)", linewidth=2)
 
-        ax.plot(hours_real, real, label="Observed", linewidth=2)
         ax.plot(
-            [hours_real[-1]] + hours_pred,
+            [days_real[-1]] + days_pred,
             [real[-1]] + list(predicted),
             "--o",
-            label="Predicted (next 24h)",
+            label="Predicted (next days)",
             linewidth=2
         )
-        ax.set_xticks(hours_real + hours_pred)
-        ax.set_xticklabels(time_labels, rotation=45)
 
-
-        ax.set_xlabel("Time (hours)")
+        ax.set_xticks(days_real + days_pred)
+        ax.set_xticklabels(day_labels, rotation=45)
+        ax.set_xlabel("Day")
         ax.set_ylabel("Temperature (°C)")
-        ax.set_title("Temperature Prediction for Next 24 Hours")
+        ax.set_title("Daily Temperature Prediction (Next 8 Days)")
         ax.grid(True)
         ax.legend()
-        ax.set_xlim(hours_real[-12], hours_real[-1] + 24)
+
+        ax.set_xlim(max(0, len(real) - 10), len(real) + len(predicted))
 
         fig.tight_layout()
 
@@ -65,6 +66,7 @@ class MainWindow(QtWidgets.QMainWindow):
         scene.addWidget(canvas)
         self.ui.graphicsView.setScene(scene)
         scene.setSceneRect(0, 0, view_width, view_height)
+
 
 
 if __name__ == "__main__":
